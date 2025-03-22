@@ -2,28 +2,6 @@ const container = document.querySelector(".container");
 const button = document.querySelector(".button");
 const statusBar = document.querySelector(".status-bar");
 
-function validateClues(clues, minValue, maxValue, sequenceLength) {
-  if (maxValue - minValue + 1 > sequenceLength) {
-    return false;
-  }
-  if (clues.some((clue) => !Number.isInteger(clue.value))) {
-    return false;
-  }
-  const values = clues.map((clue) => clue.value);
-  if (new Set(values).size !== values.length) {
-    return false;
-  }
-  clues.sort((a, b) => a.value - b.value);
-  for (let i = 0; i < clues.length - 1; i++) {
-    if (clues[i].value + 1 === clues[i + 1].value) {
-      if (!areAdjacent(clues[i].index, clues[i + 1].index)) {
-        return false;
-      }
-    }
-  }
-  return true;
-}
-
 function areAdjacent(index1, index2) {
   const row1 = Math.floor(index1 / 6);
   const col1 = index1 % 6;
@@ -32,56 +10,6 @@ function areAdjacent(index1, index2) {
   return (
     (row1 === row2 && Math.abs(col1 - col2) === 1) ||
     (col1 === col2 && Math.abs(row1 - row2) === 1)
-  );
-}
-
-function validateSolution(puzzle, minValue, maxValue) {
-  const expectedSequence = [];
-  for (let i = minValue; i <= maxValue; i++) {
-    expectedSequence.push(i);
-  }
-  for (const value of expectedSequence) {
-    if (!puzzle.includes(value)) {
-      return false;
-    }
-  }
-  for (let i = minValue; i < maxValue; i++) {
-    const index1 = puzzle.indexOf(i);
-    const index2 = puzzle.indexOf(i + 1);
-    if (!areAdjacent(index1, index2)) {
-      return false;
-    }
-  }
-  return true;
-}
-
-function solvePuzzle(puzzle, minValue, maxValue) {
-  const clues = puzzle
-    .map((value, index) => ({ value, index }))
-    .filter((item) => item.value !== null);
-  clues.sort((a, b) => a.value - b.value);
-  const lowestClue = clues[0];
-  const visited = new Array(36).fill(false);
-  visited[lowestClue.index] = true;
-  if (lowestClue.value > minValue) {
-    if (
-      !buildBackwards(
-        puzzle,
-        lowestClue.index,
-        lowestClue.value,
-        visited,
-        minValue
-      )
-    ) {
-      return false;
-    }
-  }
-  return buildPath(
-    puzzle,
-    lowestClue.index,
-    lowestClue.value,
-    visited,
-    maxValue
   );
 }
 
@@ -106,7 +34,6 @@ function buildBackwards(puzzle, index, value, visited, minValue) {
   for (const prevIndex of possibleMoves) {
     puzzle[prevIndex] = prevValue;
     visited[prevIndex] = true;
-
     if (buildBackwards(puzzle, prevIndex, prevValue, visited, minValue)) {
       return true;
     }
@@ -157,6 +84,96 @@ function getAdjacentCells(index) {
   return adjacent;
 }
 
+function solvePuzzle(puzzle, minValue, maxValue) {
+  const clues = puzzle
+    .map((value, index) => ({ value, index }))
+    .filter((item) => item.value !== null);
+  if (clues.length === 0) {
+    puzzle[0] = minValue;
+    const visited = new Array(36).fill(false);
+    visited[0] = true;
+    if (buildPath(puzzle, 0, minValue, visited, maxValue)) {
+      return true;
+    }
+    puzzle[0] = null;
+    return false;
+  }
+  const startingClues = clues.filter((clue) => clue.value === minValue);
+  if (startingClues.length > 0) {
+    const startingClue = startingClues[0];
+    const visited = new Array(36).fill(false);
+    visited[startingClue.index] = true;
+    return buildPath(puzzle, startingClue.index, minValue, visited, maxValue);
+  }
+  const lowestClue = clues[0];
+  const visited = new Array(36).fill(false);
+  visited[lowestClue.index] = true;
+  if (lowestClue.value > minValue) {
+    if (
+      !buildBackwards(
+        puzzle,
+        lowestClue.index,
+        lowestClue.value,
+        visited,
+        minValue
+      )
+    ) {
+      return false;
+    }
+  }
+  return buildPath(
+    puzzle,
+    lowestClue.index,
+    lowestClue.value,
+    visited,
+    maxValue
+  );
+}
+
+function validateCluesWithRange(clues, minValue, maxValue, sequenceLength) {
+  if (maxValue - minValue + 1 > sequenceLength) {
+    return false;
+  }
+  if (clues.some((clue) => !Number.isInteger(clue.value))) {
+    return false;
+  }
+  if (clues.some((clue) => clue.value < minValue || clue.value > maxValue)) {
+    return false;
+  }
+  const values = clues.map((clue) => clue.value);
+  if (new Set(values).size !== values.length) {
+    return false;
+  }
+  clues.sort((a, b) => a.value - b.value);
+  for (let i = 0; i < clues.length - 1; i++) {
+    if (clues[i].value + 1 === clues[i + 1].value) {
+      if (!areAdjacent(clues[i].index, clues[i + 1].index)) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+function validateSolution(puzzle, minValue, maxValue) {
+  for (let i = minValue; i <= maxValue; i++) {
+    if (!puzzle.includes(i)) {
+      return false;
+    }
+  }
+  for (let i = minValue; i < maxValue; i++) {
+    const index1 = puzzle.indexOf(i);
+    const index2 = puzzle.indexOf(i + 1);
+    if (!areAdjacent(index1, index2)) {
+      return false;
+    }
+  }
+  if (puzzle.includes(null)) {
+    return false;
+  }
+  return true;
+}
+
 function solve(grid) {
   const puzzle = [...grid];
   for (let i = 0; i < puzzle.length; i++) {
@@ -174,31 +191,33 @@ function solve(grid) {
     return null;
   }
   clues.sort((a, b) => a.value - b.value);
-  const minValue = clues[0].value;
-  const maxValue = clues[clues.length - 1].value;
-  const clueValues = clues.map((clue) => clue.value);
-  for (let i = 0; i < clueValues.length - 1; i++) {
-    if (clueValues[i + 1] - clueValues[i] > 1) {
-      const expectedValue = clueValues[i] + 1;
-      if (
-        !puzzle.includes(expectedValue) &&
-        puzzle.filter((cell) => cell === null).length === 0
-      ) {
-        return null;
+  const lowestClueValue = clues[0].value;
+  const highestClueValue = clues[clues.length - 1].value;
+  const absoluteMinValue = Math.max(1, highestClueValue - 35);
+  for (
+    let candidateMinValue = lowestClueValue;
+    candidateMinValue >= absoluteMinValue;
+    candidateMinValue--
+  ) {
+    const candidateMaxValue = candidateMinValue + 35;
+    if (candidateMaxValue < highestClueValue) {
+      continue;
+    }
+    const puzzleCopy = [...puzzle];
+    if (
+      !validateCluesWithRange(clues, candidateMinValue, candidateMaxValue, 36)
+    ) {
+      continue;
+    }
+    if (solvePuzzle(puzzleCopy, candidateMinValue, candidateMaxValue)) {
+      if (validateSolution(puzzleCopy, candidateMinValue, candidateMaxValue)) {
+        if (!puzzleCopy.includes(null)) {
+          return puzzleCopy;
+        }
       }
     }
   }
-  const sequenceLength = 36;
-  if (!validateClues(clues, minValue, maxValue, sequenceLength)) {
-    return null;
-  }
-  if (!solvePuzzle(puzzle, minValue, maxValue)) {
-    return null;
-  }
-  if (!validateSolution(puzzle, minValue, maxValue)) {
-    return null;
-  }
-  return puzzle;
+  return null;
 }
 
 function handleClick() {
@@ -210,12 +229,7 @@ function handleClick() {
   }
   statusBar.className = "status-bar thinking";
   setTimeout(() => {
-    // DEBUGGING
-    console.log("clues:");
-    console.log(clues);
     const solution = solve(clues);
-    console.log("solution:");
-    console.log(solution);
     if (!solution) {
       statusBar.className = "status-bar invalid";
       return;
